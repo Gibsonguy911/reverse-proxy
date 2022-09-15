@@ -1,0 +1,46 @@
+version: '3.6'
+services:
+  gitlab:
+    container_name: 'gitlab'
+    image: 'gitlab/gitlab-ee:latest'
+    restart: always
+    hostname: 'gitlab.domain.com'
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab.domain.com'
+        letsencrypt['enabled'] = false
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          "X-Forwarded-Proto" => "https", 
+          "X-Forwarded-Ssl" => "on",
+          "Host" => "gitlab.domain.com",
+          "X-Real-IP" => "$$remote_addr",
+          "X-Forwarded-For" => "$$proxy_add_x_forwarded_for",
+          "Upgrade" => "$$http_upgrade",
+          "Connection" => "$$connection_upgrade"
+        }
+        gitlab_rails['gitlab_shell_ssh_port'] = 9999
+        gitlab_rails['registry_enabled'] = true
+        gitlab_rails['registry_host'] = "https://registry.gitlab.domain.com"
+        registry_external_url 'https://registry.gitlab.domain.com'
+        registry_nginx['listen_port'] = 5005
+        registry_nginx['listen_https'] = false
+        registry_nginx['proxy_set_headers'] = {
+          "X-Forwarded-Proto" => "https", 
+          "X-Forwarded-Ssl" => "on",
+          "Host" => "registry.gitlab.domain.com",
+          "X-Real-IP" => "$$remote_addr",
+          "X-Forwarded-For" => "$$proxy_add_x_forwarded_for",
+          "Upgrade" => "$$http_upgrade",
+          "Connection" => "$$connection_upgrade"
+        }
+    ports:
+      - '9080:80'
+      - '5000:5005'
+      - '9999:9999'
+    volumes:
+      - '/etc/gitlab/config:/etc/gitlab'
+      - '/etc/gitlab/logs:/var/log/gitlab'
+      - '/etc/gitlab/data:/var/opt/gitlab'
+    shm_size: '256m'
