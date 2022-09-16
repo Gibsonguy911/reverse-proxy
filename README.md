@@ -201,14 +201,37 @@ We now have a firewall setup that allows us to masquerade and port forward exter
 
 At this point we have a FQDN pointing to our static server with subdomains = [gitlab.domain.com, registry.gitlab.domain.com]. The HTTP and HTTPS services are already setup for the external firewall and will get allowed into the network at which point the NGINX proxy will recognize the domain and proxy it to the gitlab Ubuntu server thats connected through the Wireguard vpn tunnel. The only issue is that we're currently not running the gitlab or gitlab-runner containers. So let's do that now.
 
-7. Start Gitlab
-   - <code>sudo systemctl enable gitlab</code>
-   - <code>sudo systemctl enable gitlab-runner</code>
-   - <code>sudo systemctl start gitlab</code>
-   - <code>sudo systemctl start gitlab-runner</code>
-   - You can monitor the status of the processes by running <code>journalctl -xefu gitlab</code>
-   - First spin this will take ~10 minutes to pull down the docker container and setup the instance
-   - while it's spinning up run <code>sudo cat /etc/gitlab/config/initial_root_password</code> to get the password you will need for initial login
+7.  Start Gitlab
+
+    1. Start services
+       - <code>sudo systemctl enable gitlab</code>
+       - <code>sudo systemctl enable gitlab-runner</code>
+       - <code>sudo systemctl start gitlab</code>
+       - <code>sudo systemctl start gitlab-runner</code>
+       - You can monitor the status of the processes by running <code>journalctl -xefu gitlab</code>
+
+    - First spin this will take ~10 minutes to pull down the docker container and setup the instance
+    - while it's spinning up run <code>sudo cat /etc/gitlab/config/initial_root_password</code> to get the password you will need for initial login
+
+    2.  Update gitlab-runner docker privileges
+
+        - We need to update the docker-runner to have the docker socket injected into the docker-in-docker instance so it hasa access to the CICD variables used in our pipeline script. Otherwise instead of pushing to registry.gitlab.domain.com it will try to push to docker.com
+
+        - <code>sudo nano ~/gitlab-runner/config/config.toml</code> and make sure the [runners.docker] section looks like this (privileged & volumes)
+
+                    [runners.docker]
+                    tls_verify = false
+                    image = "docker"
+                    privileged = true
+                    disable_entrypoint_overwrite = false
+                    oom_kill_disable = false
+                    disable_cache = false
+                    volumes = ["/cache", "/var/run/docker.sock:/var/run/docker.sock"]
+                    shm_size = 0
+
+        - <code>docker exec -it gitlab-runner /bin/bash</code>
+        - <code>gitlab-runner restart</code>
+        - <code>exit</code>
 
 Once this is done spinning up you should be able to access the login page by navigating to https://gitlab.domain.com
 
